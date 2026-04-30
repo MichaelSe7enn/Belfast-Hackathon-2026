@@ -1,0 +1,942 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=390px, initial-scale=1.0" />
+  <title>Mr Flood</title>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Syne:wght@600;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #0e0f13;
+      --surface: #16181f;
+      --surface2: #1e2029;
+      --accent: #c8f03d;
+      --accent2: #3df0c8;
+      --text: #f0f0ee;
+      --muted: #7a7d8a;
+      --border: #2a2d38;
+      --radius: 16px;
+      --font-head: 'Syne', sans-serif;
+      --font-mono: 'DM Mono', monospace;
+    }
+
+    html, body {
+      width: 390px;
+      height: 844px;
+      overflow: hidden;
+      background: #000;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+
+    #app {
+      width: 390px;
+      height: 844px;
+      background: var(--bg);
+      display: flex;
+      flex-direction: column;
+      position: relative;
+      overflow: hidden;
+      font-family: var(--font-mono);
+    }
+
+    /* ── TOP BAR ── */
+    #topbar {
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 52px;
+      background: linear-gradient(180deg, rgba(14,15,19,0.98) 0%, rgba(14,15,19,0.0) 100%);
+      z-index: 20;
+      display: flex;
+      align-items: center;
+      padding: 0 20px;
+      gap: 10px;
+    }
+
+    #topbar .logo {
+      font-family: var(--font-head);
+      font-weight: 800;
+      font-size: 18px;
+      color: var(--accent);
+      letter-spacing: -0.5px;
+    }
+
+    #topbar .tag {
+      font-size: 10px;
+      color: var(--muted);
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 99px;
+      padding: 2px 9px;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+    }
+
+    #topbar .status-dot {
+      width: 7px; height: 7px;
+      background: var(--accent);
+      border-radius: 50%;
+      margin-left: auto;
+      box-shadow: 0 0 8px var(--accent);
+      animation: pulse 2s infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.3; }
+    }
+
+    /* ── MAP ── */
+    #map-container {
+      width: 100%;
+      height: 430px;
+      flex-shrink: 0;
+      position: relative;
+      overflow: hidden;
+    }
+
+    #map {
+      width: 100%;
+      height: 100%;
+    }
+
+    /* leaflet tweak */
+    .leaflet-control-attribution { display: none; }
+    .leaflet-tile-pane { filter: brightness(0.6) saturate(0.5) hue-rotate(180deg); }
+
+    .map-overlay-pill {
+      position: absolute;
+      bottom: 14px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(14,15,19,0.88);
+      backdrop-filter: blur(12px);
+      border: 1px solid var(--border);
+      border-radius: 99px;
+      padding: 6px 16px;
+      font-size: 11px;
+      color: var(--muted);
+      letter-spacing: 0.05em;
+      z-index: 10;
+      white-space: nowrap;
+    }
+
+    .map-overlay-pill span { color: var(--accent); font-weight: 500; }
+
+    /* ── BOTTOM PANEL ── */
+    #bottom-panel {
+      flex: 1;
+      display: flex;
+      gap: 0;
+      border-top: 1px solid var(--border);
+      overflow: hidden;
+    }
+
+    /* divider */
+    #bottom-panel::after {
+      content: '';
+      display: none;
+    }
+
+    /* ── CALENDAR ── */
+    #calendar-section {
+      width: 50%;
+      padding: 14px 12px 10px 14px;
+      border-right: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      overflow: hidden;
+    }
+
+    .section-label {
+      font-size: 9px;
+      text-transform: uppercase;
+      letter-spacing: 0.12em;
+      color: var(--muted);
+      font-family: var(--font-mono);
+    }
+
+    #cal-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    #cal-month {
+      font-family: var(--font-head);
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--text);
+    }
+
+    .cal-nav {
+      background: none;
+      border: 1px solid var(--border);
+      color: var(--muted);
+      width: 24px; height: 24px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 14px;
+      display: flex; align-items: center; justify-content: center;
+      transition: border-color 0.15s, color 0.15s;
+    }
+
+    .cal-nav:hover { border-color: var(--accent); color: var(--accent); }
+
+    #cal-grid {
+      display: grid;
+      grid-template-columns: repeat(7, 1fr);
+      gap: 2px;
+    }
+
+    .cal-dow {
+      font-size: 8px;
+      color: var(--muted);
+      text-align: center;
+      padding-bottom: 3px;
+      letter-spacing: 0.05em;
+    }
+
+    .cal-day {
+      aspect-ratio: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 11px;
+      border-radius: 6px;
+      cursor: pointer;
+      color: var(--text);
+      transition: background 0.12s, color 0.12s;
+      position: relative;
+    }
+
+    .cal-day:hover:not(.empty) { background: var(--surface2); }
+
+    .cal-day.today {
+      color: var(--accent2);
+      font-weight: 500;
+    }
+
+    .cal-day.today::after {
+      content: '';
+      position: absolute;
+      bottom: 2px;
+      width: 3px; height: 3px;
+      background: var(--accent2);
+      border-radius: 50%;
+    }
+
+    .cal-day.selected {
+      background: var(--accent);
+      color: #0e0f13;
+      font-weight: 600;
+    }
+
+    .cal-day.selected::after { display: none; }
+
+    .cal-day.other-month { color: var(--muted); opacity: 0.4; }
+    .cal-day.empty { cursor: default; }
+
+    #selected-date-display {
+      margin-top: auto;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 7px 10px;
+      font-size: 10px;
+      color: var(--muted);
+    }
+
+    #selected-date-display strong {
+      display: block;
+      color: var(--accent);
+      font-size: 11px;
+      margin-top: 1px;
+    }
+
+    /* ── STREETS LIST ── */
+    #streets-section {
+      width: 50%;
+      padding: 14px 12px 10px 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      overflow: hidden;
+    }
+
+    #streets-search {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 5px 9px;
+      font-size: 11px;
+      color: var(--text);
+      font-family: var(--font-mono);
+      outline: none;
+      width: 100%;
+      transition: border-color 0.15s;
+    }
+
+    #streets-search::placeholder { color: var(--muted); }
+    #streets-search:focus { border-color: var(--accent); }
+
+    #streets-list {
+      flex: 1;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      scrollbar-width: thin;
+      scrollbar-color: var(--border) transparent;
+    }
+
+    .street-item {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 7px 9px;
+      cursor: pointer;
+      transition: border-color 0.15s, background 0.12s;
+      display: flex;
+      align-items: center;
+      gap: 7px;
+    }
+
+    .street-item:hover { border-color: var(--accent2); background: var(--surface2); }
+
+    .street-item.active {
+      border-color: var(--accent);
+      background: rgba(200, 240, 61, 0.06);
+    }
+
+    .street-dot {
+      width: 6px; height: 6px;
+      border-radius: 50%;
+      background: var(--muted);
+      flex-shrink: 0;
+      transition: background 0.15s;
+    }
+
+    .street-item.active .street-dot { background: var(--accent); box-shadow: 0 0 6px var(--accent); }
+    .street-item:hover .street-dot { background: var(--accent2); }
+
+    .street-name {
+      font-size: 10.5px;
+      color: var(--text);
+      line-height: 1.3;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .street-type {
+      font-size: 8.5px;
+      color: var(--muted);
+      margin-top: 1px;
+    }
+
+    /* ── HOME INDICATOR ── */
+    #home-bar {
+      position: absolute;
+      bottom: 6px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 120px;
+      height: 4px;
+      background: var(--muted);
+      border-radius: 99px;
+      opacity: 0.35;
+    }
+  </style>
+</head>
+<body>
+<div id="app">
+
+  <!-- Top Bar -->
+  <div id="topbar">
+    <span class="logo">Mr Flood</span>
+    <span class="tag">Live</span>
+    <div class="status-dot"></div>
+  </div>
+
+  <!-- Map -->
+  <div id="map-container">
+    <div id="map"></div>
+    <div class="map-overlay-pill">
+      <span id="active-street-pill">Select a street</span> · Belfast, NIR
+    </div>
+  </div>
+
+  <!-- Bottom Panel -->
+  <div id="bottom-panel">
+
+    <!-- Calendar -->
+    <div id="calendar-section">
+      <div class="section-label">Date</div>
+      <div id="cal-header">
+        <button class="cal-nav" id="prev-month">&#8249;</button>
+        <div id="cal-month"></div>
+        <button class="cal-nav" id="next-month">&#8250;</button>
+      </div>
+      <div id="cal-grid"></div>
+      <div id="selected-date-display">
+        Selected date
+        <strong id="selected-date-text">—</strong>
+      </div>
+    </div>
+
+    <!-- Streets -->
+    <div id="streets-section">
+      <div class="section-label">Streets</div>
+      <input type="text" id="streets-search" placeholder="Search…" />
+      <div id="streets-list"></div>
+    </div>
+
+  </div>
+
+  <div id="home-bar"></div>
+</div>
+
+<!-- Leaflet JS (free, no API key needed) -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script>
+  // ─────────────────────────────────────────
+  // LEAFLET MAP INIT (OpenStreetMap — free)
+  // ─────────────────────────────────────────
+  const belfast = [54.5973, -5.9301];
+
+  const map = L.map('map', {
+    center: belfast,
+    zoom: 14,
+    zoomControl: false,
+    attributionControl: false,
+  });
+
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    maxZoom: 19,
+  }).addTo(map);
+
+  let activeMarker = null;
+
+  // ─────────────────────────────────────────
+  // CALENDAR
+  // ─────────────────────────────────────────
+  const DAYS = ['Su','Mo','Tu','We','Th','Fr','Sa'];
+  const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+
+  let viewYear = new Date().getFullYear();
+  let viewMonth = new Date().getMonth();
+  let selectedDate = null;
+
+  function renderCalendar() {
+    document.getElementById('cal-month').textContent = `${MONTHS[viewMonth].slice(0,3)} ${viewYear}`;
+    const grid = document.getElementById('cal-grid');
+    grid.innerHTML = '';
+
+    // Day headers
+    DAYS.forEach(d => {
+      const el = document.createElement('div');
+      el.className = 'cal-dow';
+      el.textContent = d;
+      grid.appendChild(el);
+    });
+
+    const firstDay = new Date(viewYear, viewMonth, 1).getDay();
+    const daysInMonth = new Date(viewYear, viewMonth + 1, 0).getDate();
+    const daysInPrev = new Date(viewYear, viewMonth, 0).getDate();
+    const today = new Date();
+
+    // Prev month trailing days
+    for (let i = firstDay - 1; i >= 0; i--) {
+      const el = document.createElement('div');
+      el.className = 'cal-day other-month';
+      el.textContent = daysInPrev - i;
+      grid.appendChild(el);
+    }
+
+    // Current month
+    for (let d = 1; d <= daysInMonth; d++) {
+      const el = document.createElement('div');
+      el.className = 'cal-day';
+
+      const isToday = d === today.getDate() && viewMonth === today.getMonth() && viewYear === today.getFullYear();
+      if (isToday) el.classList.add('today');
+
+      if (selectedDate && selectedDate.d === d && selectedDate.m === viewMonth && selectedDate.y === viewYear) {
+        el.classList.add('selected');
+      }
+
+      el.textContent = d;
+      el.addEventListener('click', () => selectDate(d, viewMonth, viewYear));
+      grid.appendChild(el);
+    }
+
+    // Next month leading days
+    const total = firstDay + daysInMonth;
+    const remaining = total % 7 === 0 ? 0 : 7 - (total % 7);
+    for (let i = 1; i <= remaining; i++) {
+      const el = document.createElement('div');
+      el.className = 'cal-day other-month';
+      el.textContent = i;
+      grid.appendChild(el);
+    }
+  }
+
+  async function selectDate(d, m, y) {
+    selectedDate = { d, m, y };
+    const date = new Date(y, m, d);
+    document.getElementById('selected-date-text').textContent = date.toLocaleDateString('en-GB', {
+      weekday: 'short', day: 'numeric', month: 'long', year: 'numeric'
+    });
+    await fetchDailyPrecipitation(date);
+    computeAllRisks();
+    updateStreetStyles();
+    refreshActiveStreetMarker();
+    renderStreets(document.getElementById('streets-search').value);
+    const pill = document.querySelector('.map-overlay-pill span');
+    if (pill) pill.textContent = riskSummaryText();
+    renderCalendar();
+  }
+
+  document.getElementById('prev-month').addEventListener('click', () => {
+    viewMonth--; if (viewMonth < 0) { viewMonth = 11; viewYear--; }
+    renderCalendar();
+  });
+
+  document.getElementById('next-month').addEventListener('click', () => {
+    viewMonth++; if (viewMonth > 11) { viewMonth = 0; viewYear++; }
+    renderCalendar();
+  });
+
+  renderCalendar();
+
+  // ─────────────────────────────────────────
+  // RISK COLOURS
+  // Flood risk is now computed automatically from
+  // street type, length, and proximity to water.
+  // ─────────────────────────────────────────
+  const RISK = {
+    high:    { color: '#e83a3a', label: 'HIGH',   dotClass: 'risk-high' },
+    medium:  { color: '#f0a500', label: 'MED',    dotClass: 'risk-med'  },
+    low:     { color: '#28c75a', label: 'LOW',    dotClass: 'risk-low'  },
+  };
+
+  const WATER_FEATURES = [
+    {
+      name: 'River Lagan',
+      coords: [
+        [54.59510, -5.91980],
+        [54.59350, -5.92050],
+        [54.59150, -5.92110],
+        [54.58950, -5.92180],
+        [54.58770, -5.92230],
+        [54.58570, -5.92270],
+        [54.58320, -5.92340],
+      ],
+    },
+    {
+      name: 'Belfast Lough',
+      coords: [
+        [54.64740, -5.88590],
+        [54.63270, -5.86970],
+        [54.62040, -5.86260],
+      ],
+    },
+  ];
+
+  function toRad(value) {
+    return value * Math.PI / 180;
+  }
+
+  function metersBetween(a, b) {
+    const R = 6371000;
+    const dLat = toRad(b[0] - a[0]);
+    const dLon = toRad(b[1] - a[1]);
+    const lat1 = toRad(a[0]);
+    const lat2 = toRad(b[0]);
+    const sinLat = Math.sin(dLat / 2);
+    const sinLon = Math.sin(dLon / 2);
+    const h = sinLat * sinLat + Math.cos(lat1) * Math.cos(lat2) * sinLon * sinLon;
+    return 2 * R * Math.asin(Math.sqrt(h));
+  }
+
+  function getStreetLengthMeters(coords) {
+    let total = 0;
+    for (let i = 1; i < coords.length; i += 1) {
+      total += metersBetween(coords[i - 1], coords[i]);
+    }
+    return total;
+  }
+
+  function distanceToWater(point) {
+    let minDistance = Infinity;
+    WATER_FEATURES.forEach(feature => {
+      feature.coords.forEach(waterPoint => {
+        const d = metersBetween(point, waterPoint);
+        if (d < minDistance) minDistance = d;
+      });
+    });
+    return minDistance;
+  }
+
+  const WEATHER_STATE = {
+    precipitation: 0,
+    date: null,
+    source: 'open-meteo',
+  };
+
+  function formatISODate(date) {
+    return date.toISOString().slice(0, 10);
+  }
+
+  async function fetchDailyPrecipitation(date) {
+    const day = date || new Date();
+    WEATHER_STATE.date = formatISODate(day);
+    const url = `https://api.open-meteo.com/v1/forecast?latitude=54.5973&longitude=-5.9301&daily=precipitation_sum&start_date=${WEATHER_STATE.date}&end_date=${WEATHER_STATE.date}&timezone=Europe/London`;
+
+    try {
+      const res = await fetch(url);
+      const data = await res.json();
+      const precipitation = data.daily?.precipitation_sum?.[0];
+      if (typeof precipitation === 'number') {
+        WEATHER_STATE.precipitation = precipitation;
+        return precipitation;
+      }
+    } catch (error) {
+      console.warn('Precipitation fetch failed:', error);
+    }
+
+    WEATHER_STATE.precipitation = 2.5;
+    return WEATHER_STATE.precipitation;
+  }
+
+  async function fetchStreetElevation(street) {
+    const url = `https://api.open-meteo.com/v1/elevation?latitude=${street.lat}&longitude=${street.lng}`;
+    try {
+      const res = await fetch(url);
+      const data = await res.json();
+      if (typeof data.elevation === 'number') {
+        return data.elevation;
+      }
+    } catch (error) {
+      console.warn(`Elevation fetch failed for ${street.name}:`, error);
+    }
+    return 35 + Math.random() * 30;
+  }
+
+  function computeStreetDrainage(street) {
+    const base = {
+      Primary: 0.75,
+      Secondary: 0.68,
+      Tertiary: 0.60,
+      Residential: 0.50,
+    }[street.type] ?? 0.55;
+
+    const elevationBonus = street.elevation ? Math.min(0.12, Math.max(0, (street.elevation - 20) / 220)) : 0;
+    const proximityBonus = Math.min(0.10, distanceToWater([street.lat, street.lng]) / 3200 * 0.10);
+    const drainage = Math.min(0.95, Math.max(0.20, base + elevationBonus + proximityBonus));
+
+    street.drainage = drainage;
+    return drainage;
+  }
+
+  function getWeatherPrecipitationScore() {
+    const precipitation = WEATHER_STATE.precipitation ?? 0;
+    return Math.min(1, precipitation / 20) * 0.18;
+  }
+
+  function evaluateStreetRisk(street) {
+    const typeWeight = {
+      Primary: 0.25,
+      Secondary: 0.20,
+      Tertiary: 0.15,
+      Residential: 0.10,
+    }[street.type] ?? 0.12;
+
+    const proximity = distanceToWater([street.lat, street.lng]);
+    let proximityScore = 0;
+    if (proximity <= 300) proximityScore = 0.50;
+    else if (proximity <= 700) proximityScore = 0.35;
+    else if (proximity <= 1400) proximityScore = 0.20;
+    else if (proximity <= 2200) proximityScore = 0.10;
+
+    const lengthScore = Math.min(1, getStreetLengthMeters(street.coords) / 1800) * 0.15;
+    const drainageScore = (1 - (street.drainage ?? computeStreetDrainage(street))) * 0.14;
+    const precipitationScore = getWeatherPrecipitationScore();
+    const rawScore = typeWeight + proximityScore + lengthScore + drainageScore + precipitationScore;
+    const finalScore = Math.min(1, rawScore);
+
+    street.riskScore = finalScore;
+    street.riskLabel = finalScore >= 0.72 ? 'high' : finalScore >= 0.46 ? 'medium' : 'low';
+    street.risk = street.riskLabel;
+
+    return street.riskLabel;
+  }
+
+  function computeAllRisks() {
+    STREETS.forEach(street => {
+      street.risk = evaluateStreetRisk(street);
+    });
+  }
+
+  function updateStreetStyles() {
+    STREETS.forEach(street => {
+      const style = RISK[street.risk];
+      const layer = streetLayers[street.name];
+      if (!layer) return;
+      layer.glow.setStyle({ color: style.color });
+      layer.line.setStyle({ color: style.color });
+      layer.r = style;
+      if (activeStreet === street.name) {
+        layer.line.setStyle({ weight: 6.5, opacity: 1 });
+      }
+    });
+  }
+
+  function refreshActiveStreetMarker() {
+    if (!activeStreet) return;
+    const street = STREETS.find(s => s.name === activeStreet);
+    if (!street) return;
+    const r = RISK[street.risk];
+    if (activeMarker) map.removeLayer(activeMarker);
+    activeMarker = L.marker([street.lat, street.lng], { icon: makeIcon(r.color) })
+      .addTo(map)
+      .bindPopup(`<span style="font-family:DM Mono,monospace;font-size:11px;color:#f0f0ee"><b>${street.name}</b><br><span style="color:${r.color}">● ${r.label} FLOOD RISK</span><br>Value: ${street.riskScore?.toFixed(2) ?? '—'}<br>Elevation: ${street.elevation?.toFixed(0) ?? 'N/A'} m<br>Drainage: ${street.drainage?.toFixed(2) ?? '—'}</span></span>`);
+  }
+
+  function riskSummaryText() {
+    const totals = STREETS.reduce((acc, street) => {
+      acc[street.risk] = (acc[street.risk] || 0) + 1;
+      return acc;
+    }, {});
+    const dateLabel = selectedDate
+      ? new Date(selectedDate.y, selectedDate.m, selectedDate.d).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })
+      : 'current estimate';
+    const precipitation = WEATHER_STATE.precipitation != null ? `${WEATHER_STATE.precipitation.toFixed(1)} mm` : 'N/A';
+    return `Flood risk evaluated for ${STREETS.length} streets on ${dateLabel} · Precipitation ${precipitation} · High ${totals.high || 0}, Medium ${totals.medium || 0}, Low ${totals.low || 0}`;
+  }
+
+  async function loadWeatherAndElevation() {
+    const date = selectedDate ? new Date(selectedDate.y, selectedDate.m, selectedDate.d) : new Date();
+    await fetchDailyPrecipitation(date);
+
+    await Promise.all(STREETS.map(async street => {
+      street.elevation = await fetchStreetElevation(street);
+      computeStreetDrainage(street);
+    }));
+
+    computeAllRisks();
+    updateStreetStyles();
+    refreshActiveStreetMarker();
+    renderStreets(document.getElementById('streets-search').value);
+    const pill = document.querySelector('.map-overlay-pill span');
+    if (pill) pill.textContent = riskSummaryText();
+  }
+
+  document.addEventListener('DOMContentLoaded', () => {
+    loadWeatherAndElevation();
+  });
+
+  // ─────────────────────────────────────────
+  // STREETS — real OSM coordinates from your
+  // Overpass GeoJSON export. coords are
+  // [lat, lng] pairs tracing the actual road.
+  // ─────────────────────────────────────────
+  const STREETS = [
+    {
+      name: 'Botanic Avenue', type: 'Tertiary',
+      lat: 54.5875528, lng: -5.9327713, risk: 'high',
+      coords: [[54.5886459,-5.9332873],[54.588368,-5.9331465],[54.5880111,-5.9329723],[54.5875528,-5.9327713],[54.5870813,-5.9325368],[54.5867683,-5.9323788],[54.5866675,-5.9323347]],
+    },
+    {
+      name: 'University Road', type: 'Secondary',
+      lat: 54.5860671, lng: -5.9359936, risk: 'high',
+      coords: [[54.5842142,-5.9365295],[54.584445,-5.9364642],[54.5844964,-5.9364497],[54.5845506,-5.9364341],[54.5846047,-5.9364184],[54.5848,-5.9363662],[54.584998,-5.9363133],[54.5851731,-5.9362679],[54.5854847,-5.9361691],[54.5855176,-5.9361589],[54.5858306,-5.9360643],[54.5859966,-5.9360132],[54.5860329,-5.9360031],[54.5860671,-5.9359936],[54.5861434,-5.9359723],[54.5862382,-5.9359525],[54.5862683,-5.9359462],[54.5863025,-5.935939],[54.5863868,-5.9359212],[54.5864883,-5.9359016],[54.5870349,-5.9358034],[54.5871159,-5.9357885],[54.5873984,-5.9357239],[54.58764,-5.9356391],[54.5877894,-5.9355823],[54.5878176,-5.9355638],[54.5879507,-5.9354753]],
+    },
+    {
+      name: 'Ormeau Road', type: 'Primary',
+      lat: 54.5805464, lng: -5.9207492, risk: 'high',
+      coords: [[54.5820363,-5.9215657],[54.5818307,-5.9214693],[54.5814084,-5.9212702],[54.5813707,-5.9212484],[54.5813404,-5.9212319],[54.5813092,-5.9212132],[54.5806243,-5.9208025],[54.5805464,-5.9207492],[54.5798766,-5.920255],[54.5798384,-5.9202261],[54.5798056,-5.9202038],[54.5795736,-5.9200261],[54.579534,-5.919995],[54.5794946,-5.9199651],[54.5791504,-5.9197035]],
+    },
+    {
+      name: 'Ormeau Avenue', type: 'Tertiary',
+      lat: 54.5927319, lng: -5.9286163, risk: 'high',
+      coords: [[54.5930336,-5.9300617],[54.5929603,-5.9296985],[54.5929377,-5.9295924],[54.5927896,-5.9288895],[54.5927319,-5.9286163],[54.5927091,-5.9285148],[54.592699,-5.9284695],[54.5926909,-5.9284336],[54.5926303,-5.928163]],
+    },
+    {
+      name: 'Sandy Row', type: 'Secondary',
+      lat: 54.5913422, lng: -5.9368984, risk: 'medium',
+      coords: [[54.5897431,-5.936528],[54.5898572,-5.9365787],[54.5903132,-5.9367865],[54.5903503,-5.9368034],[54.5905252,-5.9368806],[54.5907104,-5.9369643],[54.5908142,-5.9369961],[54.5909017,-5.9370094],[54.5909965,-5.9370112],[54.5911333,-5.9369807],[54.5913422,-5.9368984],[54.5915971,-5.936783],[54.5918695,-5.9366596],[54.5919425,-5.9366261],[54.5920639,-5.9365789],[54.5923454,-5.9365091],[54.5926519,-5.9364637],[54.5927857,-5.9364439],[54.5930025,-5.9364599],[54.5930208,-5.9364613]],
+    },
+    {
+      name: 'Donegall Pass', type: 'Tertiary',
+      lat: 54.5900594, lng: -5.9286699, risk: 'medium',
+      coords: [[54.5898153,-5.931083],[54.589855,-5.9307124],[54.589902,-5.9302733],[54.5900427,-5.9288395],[54.5900534,-5.9287309],[54.5900594,-5.9286699],[54.5900656,-5.9286099],[54.590174,-5.9275636],[54.590207,-5.9272208],[54.5902307,-5.9269906],[54.5903304,-5.9260735]],
+    },
+    {
+      name: 'University Street', type: 'Tertiary',
+      lat: 54.5861995, lng: -5.9275417, risk: 'medium',
+      coords: [[54.5861689,-5.9322302],[54.5861677,-5.9320496],[54.5861691,-5.9319722],[54.5861696,-5.9319072],[54.5861712,-5.9308291],[54.5861715,-5.930208],[54.5861851,-5.929497],[54.586189,-5.9288681],[54.5861934,-5.9282158],[54.5861995,-5.9275417],[54.5862014,-5.9273257],[54.5862092,-5.9264707],[54.5862162,-5.9257045],[54.5862231,-5.9253863],[54.5862476,-5.9250876],[54.5863002,-5.9247394],[54.5863113,-5.9246661],[54.5863862,-5.9241941]],
+    },
+    {
+      name: 'Chlorine Gardens', type: 'Residential',
+      lat: 54.5796861, lng: -5.9377627, risk: 'medium',
+      coords: [[54.580108,-5.9388502],[54.5800669,-5.9386832],[54.5799816,-5.9383999],[54.5799148,-5.9381911],[54.5798591,-5.938071],[54.5796861,-5.9377627],[54.5793081,-5.9370892],[54.5790814,-5.9366835],[54.5790688,-5.9366402],[54.579068,-5.9366116]],
+    },
+    {
+      name: 'Lower Crescent', type: 'Residential',
+      lat: 54.5877391, lng: -5.9347938, risk: 'medium',
+      coords: [[54.58764,-5.9356391],[54.5876439,-5.9354912],[54.5876528,-5.935377],[54.5876681,-5.9352737],[54.5877391,-5.9347938],[54.5878617,-5.9339509],[54.5878643,-5.933933],[54.5879063,-5.9337106]],
+    },
+    {
+      name: 'Rugby Road', type: 'Residential',
+      lat: 54.5846712, lng: -5.9304338, risk: 'low',
+      coords: [[54.5821705,-5.928607],[54.5826589,-5.9292236],[54.5831114,-5.9297978],[54.5833714,-5.9301006],[54.5837883,-5.9305963],[54.5838397,-5.9306452],[54.5838736,-5.9306476],[54.583939,-5.9306281],[54.5840478,-5.9306068],[54.5846184,-5.930444],[54.5846712,-5.9304338],[54.584722,-5.9304287],[54.5847406,-5.930427],[54.584801,-5.9304215],[54.5853127,-5.9302907],[54.585423,-5.9302625],[54.585625,-5.9302362],[54.5857123,-5.9302249],[54.5860648,-5.9302139],[54.5861715,-5.930208]],
+    },
+    {
+      name: 'Windsor Avenue', type: 'Residential',
+      lat: 54.5798062, lng: -5.9438368, risk: 'low',
+      coords: [[54.5809836,-5.9484456],[54.5807939,-5.9476681],[54.5806438,-5.9470689],[54.5805348,-5.9466642],[54.5804074,-5.9462273],[54.5802608,-5.9456444],[54.5801938,-5.9453781],[54.5800544,-5.9448238],[54.5799383,-5.9443617],[54.5798062,-5.9438368],[54.5795527,-5.9428286],[54.5794937,-5.9426242],[54.5793525,-5.9421351],[54.5791789,-5.9417463],[54.5789918,-5.9414436],[54.5788584,-5.9412381],[54.57864,-5.9409153],[54.5782479,-5.9403226]],
+    },
+    {
+      name: 'Lisburn Road', type: 'Primary',
+      lat: 54.5768126, lng: -5.9535682, risk: 'low',
+      coords: [[54.5726044,-5.9597641],[54.5727543,-5.9594893],[54.572893,-5.9592632],[54.5729997,-5.9591015],[54.5730878,-5.9589521],[54.5731907,-5.9587845],[54.5734072,-5.9584462],[54.5736812,-5.958018],[54.5741576,-5.95725],[54.5742344,-5.9571395],[54.5745037,-5.9567239],[54.5746274,-5.9565361],[54.5751435,-5.9557796],[54.5753755,-5.9554741],[54.5757556,-5.9549632],[54.5760364,-5.9545627],[54.5762574,-5.9542753],[54.576523,-5.9539367],[54.5765342,-5.9539224],[54.5766567,-5.953763],[54.5768126,-5.9535682],[54.5770853,-5.953218],[54.5771469,-5.9531371],[54.5773968,-5.9528298],[54.5777964,-5.952351],[54.5779613,-5.9521614],[54.5779957,-5.9521217],[54.5780248,-5.9520885],[54.5783381,-5.9517504],[54.5787094,-5.9513186],[54.5790966,-5.9508542],[54.5795691,-5.9502991],[54.5798883,-5.9499082],[54.5799584,-5.949818],[54.5800529,-5.9496899],[54.5805061,-5.9490838],[54.5807036,-5.9488197],[54.5809216,-5.9485282],[54.5809836,-5.9484456],[54.5817849,-5.9473787]],
+    },
+    {
+      name: 'Malone Road', type: 'Secondary',
+      lat: 54.5733793, lng: -5.9466634, risk: 'low',
+      coords: [[54.5699997,-5.9470321],[54.5702041,-5.947077],[54.5705255,-5.9471433],[54.5706963,-5.9471785],[54.5707586,-5.9471892],[54.5710473,-5.947237],[54.5713477,-5.9472624],[54.5714535,-5.9472713],[54.5716761,-5.9472804],[54.5718465,-5.9472632],[54.5719838,-5.947237],[54.5721628,-5.9471714],[54.5723008,-5.9471142],[54.5733513,-5.9466787],[54.5733793,-5.9466634],[54.5735638,-5.9465563],[54.5736166,-5.9465232],[54.5736527,-5.9464992],[54.5738534,-5.9463653],[54.5742557,-5.9460577],[54.574441,-5.9459145],[54.5746773,-5.9457354],[54.5749686,-5.9455061],[54.5751575,-5.9453454],[54.5753547,-5.9451583],[54.5756163,-5.9448744],[54.5758599,-5.9445832],[54.576126,-5.9442082]],
+    },
+    {
+      name: 'Ann Street', type: 'Primary',
+      lat: 54.5995294, lng: -5.9235667, risk: 'low',
+      coords: [[54.5996185,-5.9218908],[54.5996098,-5.9219742],[54.5996035,-5.922058],[54.5995889,-5.9223626],[54.5995702,-5.9228092],[54.5995598,-5.9229672],[54.5995294,-5.9235667],[54.599516,-5.9237905],[54.5995136,-5.9238527],[54.5995112,-5.923903],[54.5995079,-5.9240149],[54.5995135,-5.9241529]],
+    },
+    {
+      name: 'Castle Street', type: 'Primary',
+      lat: 54.5992413, lng: -5.9339174, risk: 'low',
+      coords: [[54.5992228,-5.9333096],[54.5992396,-5.9335986],[54.5992347,-5.9337686],[54.5992413,-5.9339174],[54.5992463,-5.9340151],[54.5992704,-5.9344546]],
+    },
+  ];
+
+  computeAllRisks();
+
+  // ─────────────────────────────────────────
+  // DRAW ALL STREET LINES ON MAP AT LOAD
+  // ─────────────────────────────────────────
+  const streetLayers = {};
+
+  STREETS.forEach(street => {
+    const r = RISK[street.riskLabel || street.risk];
+
+    // Wide transparent glow beneath
+    const glow = L.polyline(street.coords, {
+      color: r.color, weight: 12, opacity: 0.12,
+    }).addTo(map);
+
+    // Main coloured line
+    const line = L.polyline(street.coords, {
+      color: r.color, weight: 3.5, opacity: 0.9,
+    }).addTo(map);
+
+    streetLayers[street.name] = { glow, line, r };
+
+    // Click the line on the map to select it
+    [line, glow].forEach(l => l.on('click', () => selectStreet(street)));
+    line.on('mouseover', () => line.setStyle({ weight: 6, opacity: 1 }));
+    line.on('mouseout',  () => {
+      if (activeStreet !== street.name) line.setStyle({ weight: 3.5, opacity: 0.9 });
+    });
+  });
+
+  // ─────────────────────────────────────────
+  // STREETS LIST
+  // ─────────────────────────────────────────
+  let activeStreet = null;
+
+  function makeIcon(color) {
+    return L.divIcon({
+      className: '',
+      html: `<div style="width:11px;height:11px;background:${color};border:2px solid #0e0f13;border-radius:50%;box-shadow:0 0 7px ${color}99"></div>`,
+      iconSize: [11,11], iconAnchor: [5,5],
+    });
+  }
+
+  function selectStreet(street) {
+    const r = RISK[street.riskLabel || street.risk];
+
+    // Reset previously active line weight
+    if (activeStreet && streetLayers[activeStreet]) {
+      streetLayers[activeStreet].line.setStyle({ weight: 3.5, opacity: 0.9 });
+    }
+
+    activeStreet = street.name;
+    document.getElementById('active-street-pill').textContent = street.name;
+
+    // Thicken selected line
+    streetLayers[street.name].line.setStyle({ weight: 6.5, opacity: 1 });
+
+    map.flyTo([street.lat, street.lng], 16, { duration: 0.7 });
+
+    if (activeMarker) map.removeLayer(activeMarker);
+    activeMarker = L.marker([street.lat, street.lng], { icon: makeIcon(r.color) })
+      .addTo(map)
+      .bindPopup(`<span style="font-family:DM Mono,monospace;font-size:11px;color:#f0f0ee"><b>${street.name}</b><br><span style="color:${r.color}">● ${r.label} FLOOD RISK</span><br>Value: ${street.riskScore?.toFixed(2) ?? '—'}</span></span>`)
+      .openPopup();
+
+    renderStreets(document.getElementById('streets-search').value);
+  }
+
+  function renderStreets(filter = '') {
+    const list = document.getElementById('streets-list');
+    list.innerHTML = '';
+
+    // Sort: high first, then medium, then low
+    const order = { high: 0, medium: 1, low: 2 };
+    const filtered = STREETS
+      .filter(s => s.name.toLowerCase().includes(filter.toLowerCase()))
+      .sort((a, b) => (order[a.riskLabel || a.risk] ?? 3) - (order[b.riskLabel || b.risk] ?? 3));
+
+    filtered.forEach(street => {
+      const label = RISK[street.riskLabel || street.risk] || RISK.low;
+      const isActive = activeStreet === street.name;
+      const item   = document.createElement('div');
+      item.className = 'street-item' + (isActive ? ' active' : '');
+
+      item.innerHTML = `
+        <div class="street-dot" style="background:${label.color};box-shadow:0 0 5px ${label.color}88"></div>
+        <div style="flex:1;min-width:0">
+          <div class="street-name">${street.name}</div>
+          <div class="street-type">${street.type} · ${street.riskScore?.toFixed(2) ?? '—'}</div>
+        </div>
+        <div style="
+          font-size:8px;font-family:var(--font-mono);
+          padding:2px 6px;border-radius:99px;flex-shrink:0;
+          background:${label.color}22;color:${label.color};
+          border:1px solid ${label.color}44;letter-spacing:.05em;
+        ">${label.label}</div>
+      `;
+
+      item.addEventListener('click', () => selectStreet(street));
+      list.appendChild(item);
+    });
+
+    if (filtered.length === 0) {
+      list.innerHTML = '<div style="color:var(--muted);font-size:10px;padding:6px 2px">No streets found</div>';
+    }
+  }
+
+  document.getElementById('streets-search').addEventListener('input', e => {
+    renderStreets(e.target.value);
+  });
+
+  renderStreets();
+</script>
+</body>
+</html>
